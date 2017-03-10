@@ -14,6 +14,7 @@
 #include <avr/interrupt.h>
 #include <Wire.h>
 #include <LCD.h>
+// uses NewLiquidCrystal library
 #include <LiquidCrystal_I2C.h>
 
 // input digital pins
