@@ -34,7 +34,7 @@
 
 /* Turn on backlight for set period of time
  * disable measuring during this time
- * then reenable measuring and disable backlight.
+ * but checkTime must be called externally.
  */
 class LcdBacklight {
   private:
@@ -184,7 +184,7 @@ void setup()
 
 void loop()
 {
-  if(lcdBacklight.checkTime()) {
+  if(lcdBacklight.checkTime()) { // when checkTime returns true, reenable measuring
     Serial.println("loop");
     initInterrupts();
   }
