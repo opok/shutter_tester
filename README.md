@@ -17,4 +17,6 @@ My sensors (phototransistors) are 30x20mm apart, positioned diagonally for measu
 so the travel time is multiplied by 1.2 to give result for 36mm or 24mm travel.
 
 uses https://github.com/JChristensen/Timer v2 library
-https://github.com/todbot/SoftI2CMaster for LCD via I2C
+https://bitbucket.org/fmalpartida/new-liquidcrystal for LCD via I2C
+
+To find the address of your I2C LCD, use I2C scanner from https://github.com/todbot/SoftI2CMaster (also part of New Liquid Crystal library)
