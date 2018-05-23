@@ -2,19 +2,27 @@
  * @author Ondrej Pok
  * @version 2.1
  *
- * circuit uses Arduino Nano and its internal pullup resistor.
- * phototransistor is connected between D2 and GND, and second between D3 and GND.
- * 
- * Digital pin is set to HIGH, but when light hits phototransistor, 
+ * Arduino camera focal plane shutter speed tester
+ *
+ * Circuit uses Arduino Nano 5V and its internal pullup resistor.
+ * 2 phototransistors are connected between D2 and GND, and second between D3 and GND.
+ * D2 and D3 because hardware interrupts are available on those pins.
+ *
+ * Digital input pin is set to HIGH, but when light hits phototransistor, 
  * that pulls the volatage of the pin to the ground so reading of the pin returns LOW.
  * I use interrupts to capture the exact moment the pin is pulled low or goes high.
+ * In interrupt handler routine only the microsecond time is saved.
  *
- * The output on LCD shows shutter speed as well as curtain travel time from sensor to sensor.
- * My sensors are 30x20mm apart, positioned diagonally for measuring horizontal as well as vertical shutter,
+ * 1604 a.k.a. 16 x 4 character LCD is connected via I2C by 4 wires: SDA, SCL and power supply 5V and GND.
+ *
+ * The output on LCD shows exposure time for each sensor as well as curtain travel time from sensor 1 to sensor 2.
+ * My sensors (phototransistors) are 30x20mm apart, positioned diagonally for measuring horizontal as well as vertical shutter,
  * so the travel time is multiplied by 1.2 to give result for 36mm or 24mm travel.
- * 
+ *
  * uses https://github.com/JChristensen/Timer v2 library
- * https://github.com/todbot/SoftI2CMaster for LCD via I2C
+ * https://bitbucket.org/fmalpartida/new-liquidcrystal for LCD via I2C
+ *
+ * To find the address of your I2C LCD, use I2C scanner from https://github.com/todbot/SoftI2CMaster (also part of New Liquid Crystal library)
  */
 
 #include <avr/io.h>
