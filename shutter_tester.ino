@@ -1,22 +1,7 @@
 /*
- * @author Ondrej Pok
- * @version 2.0
- *
- * circuit uses Arduino Nano and its internal pullup resistor.
- * phototransistor is connected between D2 and GND, and second between D3 and GND.
- * 
- * Digital pin is set to HIGH, but when light hits phototransistor, 
- * that pulls the volatage of the pin to the ground so reading of the pin returns LOW.
- * I use interrupts to capture the exact moment the pin is pulled low or goes high.
- *
- * The output on LCD shows shutter speed as well as curtain travel time from sensor to sensor.
- * My sensors are 30x20mm apart, positioned diagonally for measuring horizontal as well as vertical shutter,
- * so the travel time is multiplied by 1.2 to give result for 36mm or 24mm travel.
- * 
- * uses https://github.com/JChristensen/Timer v2 library
- * https://github.com/todbot/SoftI2CMaster for LCD via I2C
+ * obvod s pouzitim interneho pullup rezistora.
+ * fototranzistor je zapojeny medzi digital pin 2/3 a GND
  */
-
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <Wire.h>
@@ -62,25 +47,37 @@ void resetMeasuredData(void *context) {
   initInterrupts();
 }
 
-void printResults(int row, unsigned long exposure, unsigned long travel) {
-  lcd.setCursor(0, row);
-  lcd.print("                ");
-  lcd.setCursor(0, row);
-  if(exposure < ONE_SECOND) {
-    lcd.print("1/"); lcd.print(round(1.0/((double)exposure/ONE_SECOND)), DEC);
-  } else {
-    lcd.print(exposure/1000, DEC); lcd.print("ms"); 
-  }
-
-  travel = (unsigned long) 1.2 * travel;
-  int whole = travel/1000; // whole part from microseconds to miliseconds
-  int fraction = (travel - (travel/1000) * 1000)/10; // 2 fractional digits
-  lcd.setCursor(10 - floor(log10(whole)), row);
+void printRightAlignedMs(int row, unsigned long microseconds) {
+  int whole = microseconds/1000; // whole part from microseconds to miliseconds
+  int fraction = (microseconds % 1000) / 10; // 2 fractional digits
+  lcd.setCursor(10 - floor(log10(whole)), row); // how many digits ?
   lcd.print(whole, DEC);
   lcd.print('.');
   if(fraction < 10) lcd.print('0');
   lcd.print(fraction, DEC);
   lcd.print("ms");
+}
+
+void printExposure(int row, String description, unsigned long exposure) {
+  lcd.setCursor(0, row);
+  lcd.print("                "); // clear
+  lcd.setCursor(0, row);
+  lcd.print(description); lcd.print(" ");
+
+  if(exposure < ONE_SECOND) {
+    lcd.print("1/"); lcd.print(round(1.0/((double)exposure/ONE_SECOND)), DEC);  
+  }
+  printRightAlignedMs(row, exposure);
+}
+
+void printTravel(int row, String description, unsigned long travel) {
+  lcd.setCursor(0, row);
+  lcd.print("                ");
+  lcd.setCursor(0, row);
+  lcd.print(description); lcd.print(" ");
+
+  travel = (unsigned long) 1.2 * travel; // sensors 20x30mm apart, extrapolate 24 or 36mm
+  printRightAlignedMs(row, travel);
 }
 
 void onDataReady() {
@@ -96,10 +93,12 @@ void onDataReady() {
   Serial.print("Travel 1 "); Serial.println(travel1);
   Serial.print("Travel 2 "); Serial.println(travel2);
   
-  printResults(0, exposure1, travel1);
-  printResults(1, exposure2, travel2);
+  printExposure(0, "E1", exposure1);
+  printExposure(1, "Eu2", exposure2);
+  printTravel(2, "Open", travel1);
+  printTravel(3, "Close", travel2);
 
-  timer.after(1000, resetMeasuredData, (void*)0);
+  timer.after(2000, resetMeasuredData, (void*)0);
 }
 
 void s1_down() {
@@ -109,7 +108,8 @@ void s1_down() {
   }
   detachInterrupt(digitalPinToInterrupt(SENSOR_1));
   attachInterrupt(digitalPinToInterrupt(SENSOR_1), s1_up, RISING);
-  Serial.print("Sensor 1 on at "); Serial.println(s1[0]);
+  //TODO: timer to stop waiting for more signals and to reset interrupts after ~2 seconds
+  //Serial.print("Sensor 1 on at "); Serial.println(s1[0]);
 }
 
 void s1_up() {
@@ -117,7 +117,7 @@ void s1_up() {
   if(s1[1] == 0)
     s1[1] = micros();
   detachInterrupt(digitalPinToInterrupt(SENSOR_1));
-  Serial.print("Sensor 1 off at "); Serial.println(s1[1]);
+  //Serial.print("Sensor 1 off at "); Serial.println(s1[1]);
 }
 
 void s2_down() {
@@ -126,7 +126,7 @@ void s2_down() {
     s2[0] = micros();
   detachInterrupt(digitalPinToInterrupt(SENSOR_2));
   attachInterrupt(digitalPinToInterrupt(SENSOR_2), s2_up, RISING);
-  Serial.print("Sensor 2 on at "); Serial.println(s2[0]);
+  //Serial.print("Sensor 2 on at "); Serial.println(s2[0]);
 }
 
 void s2_up() {
@@ -134,7 +134,7 @@ void s2_up() {
   if(s2[1] == 0)
     s2[1] = micros();
   detachInterrupt(digitalPinToInterrupt(SENSOR_2));
-  Serial.print("Sensor 2 off at "); Serial.println(s2[1]);
+  //Serial.print("Sensor 2 off at "); Serial.println(s2[1]);
 }
 
 void initInterrupts() {
