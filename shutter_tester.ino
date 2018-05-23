@@ -73,7 +73,10 @@ void resetMeasuredData(void *context) {
 void printRightAlignedMs(int row, unsigned long microseconds) {
   int whole = microseconds/1000; // whole part from microseconds to miliseconds
   int fraction = (microseconds % 1000) / 10; // 2 fractional digits
-  lcd.setCursor(10 - floor(log10(whole)), row); // how many digits ?
+  if(whole > 0)
+    lcd.setCursor(10 - floor(log10(whole)), row); // how many digits ?
+  else
+    lcd.setCursor(10, row); // 0.12ms
   lcd.print(whole, DEC);
   lcd.print('.');
   if(fraction < 10) lcd.print('0');
@@ -117,7 +120,7 @@ void onDataReady() {
   Serial.print("Travel 2 "); Serial.println(travel2);
   
   printExposure(0, "E1", exposure1);
-  printExposure(1, "Eu2", exposure2);
+  printExposure(1, "E2", exposure2);
   printTravel(2, "Open", travel1);
   printTravel(3, "Close", travel2);
 
