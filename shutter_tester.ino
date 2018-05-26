@@ -1,6 +1,6 @@
 /*
  * @author Ondrej Pok
- * @version 2.1
+ * @version 2.2
  *
  * Arduino camera focal plane shutter speed tester
  *
@@ -52,6 +52,7 @@
 
 // I measured the travel using simpler probe connected to PC sound card and Audacity
 // and the tester was giving lot shorter times, so this constant is to compensate.
+// Ideally this would be adjusted after comparing results with factory calibrated shutter tester.
 #define TRAVEL_CORR_COEF 1.15
 
 // see computation of exposure1 in onDataReady()
@@ -62,7 +63,7 @@
 // the transistor closes before the closing curtain completely closes the hole 
 // when the amount of light drops enough. This again may be 20%. So we only need 
 // to subtract 60% of the hole diameter from raw exposure measurement.
-#define EXPOSURE_CORR_COEF 0.6
+#define HOLE_SIZE_CORR_COEF 0.6
 
 // if you flip the probe, so S2 is exposed before S1 (S2->S1)
 // and the average of several measurements significantly differ from the position (S1->S2)
@@ -141,13 +142,13 @@ void onDataReady() {
   exp1raw = s1[1] - s1[0];
   exp2raw = s2[1] - s2[0];
   // for measuring exposure the light starts to shine on sensor 
-  //  when the opening curtain crosses the left edge of the hole
+  // when the opening curtain crosses the left edge of the hole
   // but we measure the end of exposure when the light stops shining on the sensor 
-  //  and that is after closing curtain crosses right edge of the hole
+  // and that is after closing curtain crosses right edge of the hole
   // Therefore to compensate for the size of the sensor hole
-  //  we need to subtract the time that takes the closing curtain to travel across the hole
-  exposure1 = S1_CORR_COEF * (exp1raw - EXPOSURE_CORR_COEF * HOLE_DIAMETER * travel2 / 36);
-  exposure2 = S2_CORR_COEF * (exp2raw - EXPOSURE_CORR_COEF * HOLE_DIAMETER * travel2 / 36);
+  // we need to subtract the time that takes the closing curtain to travel across the hole
+  exposure1 = S1_CORR_COEF * (exp1raw - HOLE_SIZE_CORR_COEF * HOLE_DIAMETER * travel2 / 36);
+  exposure2 = S2_CORR_COEF * (exp2raw - HOLE_SIZE_CORR_COEF * HOLE_DIAMETER * travel2 / 36);
 
   Serial.print("Exposure S1 "); Serial.println(exposure1);
   Serial.print("Exposure S2 "); Serial.println(exposure2);
