@@ -47,6 +47,29 @@
 
 #define ONE_SECOND 1000000
 
+#define HOLE_X_DISTANCE 30 // keep in mind that hole_Y_distance = hole_X_distance * 24 / 36
+#define HOLE_DIAMETER 1.0
+
+// I measured the travel using simpler probe connected to PC sound card and Audacity
+// and the tester was giving lot shorter times, so this constant is to compensate.
+#define TRAVEL_CORR_COEF 1.15
+
+// see computation of exposure1 in onDataReady()
+// This is to compensate for the simple fact that the transistor 
+// doesn't open as soon as curtain edge crosses edge of hole.
+// It takes a little bit of opening of the hole to let through enough light 
+// to open the transistor - let's say 20% of hole diameter. Same for closing curtain
+// the transistor closes before the closing curtain completely closes the hole 
+// when the amount of light drops enough. This again may be 20%. So we only need 
+// to subtract 60% of the hole diameter from raw exposure measurement.
+#define EXPOSURE_CORR_COEF 0.6
+
+// if you flip the probe, so S2 is exposed before S1 (S2->S1)
+// and the average of several measurements significantly differ from the position (S1->S2)
+// then one of these values needs to be adjusted
+#define S1_CORR_COEF 1.0
+#define S2_CORR_COEF 1.0
+
 
 LiquidCrystal_I2C lcd (I2C_ADDR,En_pin,Rw_pin,Rs_pin,D4_pin,D5_pin,D6_pin,D7_pin);
 
@@ -72,15 +95,15 @@ void resetMeasuredData(void *context) {
 
 void printRightAlignedMs(int row, unsigned long microseconds) {
   int whole = microseconds/1000; // whole part from microseconds to miliseconds
-  int fraction = (microseconds % 1000) / 10; // 2 fractional digits
+  int decimal = (microseconds % 1000) / 10; // 2 decimal digits
   if(whole > 0)
     lcd.setCursor(10 - floor(log10(whole)), row); // how many digits ?
   else
-    lcd.setCursor(10, row); // 0.12ms
+    lcd.setCursor(10, row); // e.g. 0.12ms
   lcd.print(whole, DEC);
   lcd.print('.');
-  if(fraction < 10) lcd.print('0');
-  lcd.print(fraction, DEC);
+  if(decimal < 10) lcd.print('0');
+  lcd.print(decimal, DEC);
   lcd.print("ms");
 }
 
@@ -102,65 +125,79 @@ void printTravel(int row, String description, unsigned long travel) {
   lcd.setCursor(0, row);
   lcd.print(description); lcd.print(" ");
 
-  travel = (unsigned long) 1.2 * travel; // sensors 20x30mm apart, extrapolate 24 or 36mm
   printRightAlignedMs(row, travel);
 }
 
 void onDataReady() {
   Serial.println("onDataReady");
-  unsigned long exposure1, exposure2, travel1, travel2;
-  exposure1 = s1[1] - s1[0];
-  exposure2 = s2[1] - s2[0];
-  travel1 = max(s1[0], s2[0]) - min(s1[0], s2[0]);
-  travel2 = max(s2[1], s1[1]) - min(s2[1], s1[1]);
+  unsigned long exposure1, exposure2, travel1, travel2, exp1raw, exp2raw, travel1raw, travel2raw;
 
-  Serial.print("Exposure 1 "); Serial.println(exposure1);
-  Serial.print("Exposure 2 "); Serial.println(exposure2);
-  Serial.print("Travel 1 "); Serial.println(travel1);
-  Serial.print("Travel 2 "); Serial.println(travel2);
+  travel1raw = max(s1[0], s2[0]) - min(s1[0], s2[0]);
+  travel2raw = max(s2[1], s1[1]) - min(s2[1], s1[1]);
+  // sensors approx. 20x30mm apart, extrapolate to 24 or 36mm
+  travel1 = TRAVEL_CORR_COEF * (36/HOLE_X_DISTANCE) * travel1raw;
+  travel2 = TRAVEL_CORR_COEF * (36/HOLE_X_DISTANCE) * travel2raw;
+
+  exp1raw = s1[1] - s1[0];
+  exp2raw = s2[1] - s2[0];
+  // for measuring exposure the light starts to shine on sensor 
+  //  when the opening curtain crosses the left edge of the hole
+  // but we measure the end of exposure when the light stops shining on the sensor 
+  //  and that is after closing curtain crosses right edge of the hole
+  // Therefore to compensate for the size of the sensor hole
+  //  we need to subtract the time that takes the closing curtain to travel across the hole
+  exposure1 = S1_CORR_COEF * (exp1raw - EXPOSURE_CORR_COEF * HOLE_DIAMETER * travel2 / 36);
+  exposure2 = S2_CORR_COEF * (exp2raw - EXPOSURE_CORR_COEF * HOLE_DIAMETER * travel2 / 36);
+
+  Serial.print("Exposure S1 "); Serial.println(exposure1);
+  Serial.print("Exposure S2 "); Serial.println(exposure2);
+  Serial.print("Travel opening "); Serial.println(travel1);
+  Serial.print("Travel closing "); Serial.println(travel2);
   
   printExposure(0, "E1", exposure1);
   printExposure(1, "E2", exposure2);
   printTravel(2, "Open", travel1);
   printTravel(3, "Close", travel2);
 
-  timer.after(2000, resetMeasuredData, (void*)0);
+  timer.after(1000, resetMeasuredData, (void*)0);
 }
 
 void s1_down() {
+  unsigned long measuredValue = micros();
   if(dataReady) { return; }
   if(s1[0] == 0){
-    s1[0] = micros();
+    s1[0] = measuredValue;
   }
   detachInterrupt(digitalPinToInterrupt(SENSOR_1));
   attachInterrupt(digitalPinToInterrupt(SENSOR_1), s1_up, RISING);
-  //TODO: timer to stop waiting for more signals and to reset interrupts after ~2 seconds
-  //Serial.print("Sensor 1 on at "); Serial.println(s1[0]);
+
+  //timer to stop waiting for more signals and to reset interrupts after ~2 seconds
+  timer.after(2000, resetMeasuredData, (void*)0);
 }
 
 void s1_up() {
+  unsigned long measuredValue = micros();
   if(dataReady) { return; }
   if(s1[1] == 0)
-    s1[1] = micros();
+    s1[1] = measuredValue;
   detachInterrupt(digitalPinToInterrupt(SENSOR_1));
-  //Serial.print("Sensor 1 off at "); Serial.println(s1[1]);
 }
 
 void s2_down() {
+  unsigned long measuredValue = micros();
   if(dataReady) { return; }
   if(s2[0] == 0)
-    s2[0] = micros();
+    s2[0] = measuredValue;
   detachInterrupt(digitalPinToInterrupt(SENSOR_2));
   attachInterrupt(digitalPinToInterrupt(SENSOR_2), s2_up, RISING);
-  //Serial.print("Sensor 2 on at "); Serial.println(s2[0]);
 }
 
 void s2_up() {
+  unsigned long measuredValue = micros();
   if(dataReady) { return; }
   if(s2[1] == 0)
-    s2[1] = micros();
+    s2[1] = measuredValue;
   detachInterrupt(digitalPinToInterrupt(SENSOR_2));
-  //Serial.print("Sensor 2 off at "); Serial.println(s2[1]);
 }
 
 void initInterrupts() {
