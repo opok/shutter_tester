@@ -12,7 +12,7 @@ In interrupt handler routine only the microsecond time is saved.
 
 1604 a.k.a. 16 x 4 character LCD is connected via I2C by 4 wires: SDA, SCL and power supply 5V and GND.
 
-The output on LCD shows exposure time for each sensor as well as curtain travel time from sensor 1 to sensor 2.
+The output on LCD shows exposure time for each sensor as well as curtain travel time of curtain extrapolated to 36mm frame witdth.
 My sensors (phototransistors) are 30x20mm apart, positioned diagonally for measuring horizontal as well as vertical shutter,
 so the travel time is multiplied by 1.2 to give result for 36mm or 24mm travel.
 
